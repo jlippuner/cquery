@@ -9,6 +9,7 @@
 #include <functional>
 #include <mutex>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 class QueueManager;
@@ -23,9 +24,9 @@ struct Project {
   };
 
   // Include directories for "" headers
-  std::vector<Directory> quote_include_directories;
+  std::unordered_set<Directory> quote_include_directories;
   // Include directories for <> headers
-  std::vector<Directory> angle_include_directories;
+  std::unordered_set<Directory> angle_include_directories;
 
   std::vector<Entry> entries;
   spp::sparse_hash_map<AbsolutePath, int> absolute_path_to_entry_index_;
@@ -42,6 +43,9 @@ struct Project {
   // project root, not subdirectories). For compile_commands.json, its entries
   // are indexed.
   void Load(const AbsolutePath& root_directory);
+
+  // clear the cached include directories and entries
+  void Reset();
 
   // Lookup the CompilationEntry for |filename|. If no entry was found this
   // will infer one based on existing project structure.

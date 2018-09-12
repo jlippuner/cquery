@@ -384,6 +384,13 @@ struct lsClientCapabilities {
 };
 MAKE_REFLECT_STRUCT(lsClientCapabilities, workspace, textDocument);
 
+struct lsWorkspaceFolder {
+  lsDocumentUri uri;
+  std::string name;
+};
+
+MAKE_REFLECT_STRUCT(lsWorkspaceFolder, uri, name);
+
 /////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
@@ -425,6 +432,9 @@ struct lsInitializeParams {
 
   // The initial trace setting. If omitted trace is disabled ('off').
   lsTrace trace = lsTrace::Off;
+
+  // The list of workspace folders which are all treated as root locations
+  std::vector<lsWorkspaceFolder> workspaceFolders;
 };
 
 void Reflect(Reader& reader, lsInitializeParams::lsTrace& value) {
@@ -463,7 +473,8 @@ MAKE_REFLECT_STRUCT(lsInitializeParams,
                     rootUri,
                     initializationOptions,
                     capabilities,
-                    trace);
+                    trace,
+                    workspaceFolders);
 
 struct lsInitializeError {
   // Indicates whether the client should retry to send the
@@ -514,6 +525,15 @@ struct Handler_Initialize : BaseMessageHandler<In_InitializeRequest> {
           NormalizePathOrAbort(request->params.rootUri->GetRawPath());
       LOG_S(INFO) << "[querydb] Initialize in directory " << project_path
                   << " with uri " << request->params.rootUri->raw_uri_;
+
+      std::vector<std::string> workspace_folders;
+      for (auto& wf : request->params.workspaceFolders) {
+        auto path = NormalizePathOrAbort(wf.uri.GetRawPath());
+        EnsureEndsInSlash(path);
+        workspace_folders.push_back(path);
+        LOG_S(INFO) << "[querydb] Adding workspace folder " << wf.name
+                    << " with uri " << wf.uri.raw_uri_;
+      }
 
       {
         if (request->params.initializationOptions)
@@ -603,6 +623,7 @@ struct Handler_Initialize : BaseMessageHandler<In_InitializeRequest> {
       // Set project root.
       EnsureEndsInSlash(project_path);
       g_config->projectRoot = project_path;
+      g_config->workspaceFolders = workspace_folders;
       // Create two cache directories for files inside and outside of the
       // project.
       MakeDirectoryRecursive(g_config->cacheDirectory +
@@ -615,7 +636,17 @@ struct Handler_Initialize : BaseMessageHandler<In_InitializeRequest> {
       semantic_cache->Init();
 
       // Open up / load the project.
-      project->Load(project_path);
+      project->Reset();
+      if (workspace_folders.size() > 0) {
+        // load all workspace folders
+        for (auto& f : workspace_folders) {
+          project->Load(f);
+        }
+      } else {
+        // there is no workspace folder list, so just load the single project
+        // URI
+        project->Load(project_path);
+      }
       time.ResetAndPrint("[perf] Loaded compilation entries (" +
                          std::to_string(project->entries.size()) + " files)");
 

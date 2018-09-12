@@ -24,6 +24,9 @@ struct Config {
   // Root directory of the project. **Not available for configuration**
   std::string projectRoot;
 
+  // there could be multiple workspace folders that need to be loaded separately
+  std::vector<std::string> workspaceFolders;
+
   // If specified, this option overrides compile_commands.json and this
   // external command will be executed with an option |projectRoot|.
   // The initialization options will be provided as stdin.

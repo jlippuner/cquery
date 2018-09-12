@@ -507,7 +507,8 @@ std::vector<Project::Entry> LoadFromDirectoryListing(
       [&folder_args, &files](const std::string& path) {
         if (SourceFileLanguage(path) != LanguageId::Unknown) {
           files.push_back(path);
-        } else if (GetBaseName(path) == ".cquery"  && !IsDirectory(GetDirName(path) + ".cquery")) {
+        } else if (GetBaseName(path) == ".cquery" &&
+                   !IsDirectory(GetDirName(path) + ".cquery")) {
           LOG_S(INFO) << "Using .cquery arguments from " << path;
           folder_args.emplace(GetDirName(path),
                               ReadCompilerArgumentsFromFile(path));
@@ -598,8 +599,8 @@ std::vector<Project::Entry> LoadCompilationEntriesFromDirectory(
     // from.
 
     auto tmpdir = TryMakeTempDirectory();
-    if(!tmpdir.has_value()) {
-        return {};
+    if (!tmpdir.has_value()) {
+      return {};
     }
     comp_db_dir = tmpdir.value();
 
@@ -613,7 +614,6 @@ std::vector<Project::Entry> LoadCompilationEntriesFromDirectory(
         input.GetString());
     std::ofstream(comp_db_dir + "/compile_commands.json")
         << contents.value_or("");
-
   }
 
   CXCompilationDatabase_Error cx_db_load_error =
@@ -755,15 +755,17 @@ void Project::Load(const AbsolutePath& root_directory) {
   project.extra_flags = g_config->extraClangArguments;
   project.project_dir = root_directory;
   project.resource_dir = g_config->resourceDirectory;
-  entries = LoadCompilationEntriesFromDirectory(
+
+  auto new_entries = LoadCompilationEntriesFromDirectory(
       &project, g_config->compilationDatabaseDirectory.empty()
                     ? "build"
                     : g_config->compilationDatabaseDirectory);
+  entries.insert(entries.end(), new_entries.begin(), new_entries.end());
 
   // Cleanup / postprocess include directories.
-  quote_include_directories.assign(project.quote_dirs.begin(),
+  quote_include_directories.insert(project.quote_dirs.begin(),
                                    project.quote_dirs.end());
-  angle_include_directories.assign(project.angle_dirs.begin(),
+  angle_include_directories.insert(project.angle_dirs.begin(),
                                    project.angle_dirs.end());
   for (const Directory& dir : quote_include_directories) {
     LOG_S(INFO) << "quote_include_dir: " << dir.path;
@@ -773,9 +775,15 @@ void Project::Load(const AbsolutePath& root_directory) {
   }
 
   // Setup project entries.
-  absolute_path_to_entry_index_.resize(entries.size());
   for (int i = 0; i < entries.size(); ++i)
     absolute_path_to_entry_index_[entries[i].filename] = i;
+}
+
+void Project::Reset() {
+  quote_include_directories.clear();
+  angle_include_directories.clear();
+  entries.clear();
+  absolute_path_to_entry_index_.clear();
 }
 
 void Project::SetFlagsForFile(const std::vector<std::string>& flags,

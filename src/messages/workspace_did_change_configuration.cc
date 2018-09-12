@@ -28,7 +28,17 @@ struct Handler_WorkspaceDidChangeConfiguration
   MethodType GetMethodType() const override { return kMethodType; }
   void Run(In_WorkspaceDidChangeConfiguration* request) override {
     Timer time;
-    project->Load(g_config->projectRoot);
+    project->Reset();
+    if (g_config->workspaceFolders.size() > 0) {
+      // load all workspace folders
+      for (auto& f : g_config->workspaceFolders) {
+        project->Load(f);
+      }
+    } else {
+      // there is no workspace folder list, so just load the single project
+      // URI
+      project->Load(g_config->projectRoot);
+    }
     time.ResetAndPrint("[perf] Loaded compilation entries (" +
                        std::to_string(project->entries.size()) + " files)");
 
